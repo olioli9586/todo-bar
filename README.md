@@ -12,6 +12,14 @@ A tiny macOS menu bar todo list. Same lightweight setup as the `widget` project 
 - "Clear Done" removes everything checked off right away
 - Todos persist in `~/Library/Application Support/TodoBar/todos.json`
 
+## Download (no tools needed)
+
+Grab `TodoBar.zip` from the [latest release](https://github.com/olioli9586/todo-bar/releases/latest), unzip it, and drag `TodoBar.app` into your Applications folder.
+
+**First launch:** right-click (or Control-click) TodoBar.app → **Open** → **Open**. macOS asks this once because the app isn't notarized by Apple. If it still refuses, go to System Settings → Privacy & Security and click **Open Anyway**.
+
+Requires macOS 14+ on an Apple Silicon Mac (M1 or newer).
+
 ## Build & install
 
 ```sh
