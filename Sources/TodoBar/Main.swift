@@ -1,8 +1,13 @@
-import Foundation
+import AppKit
 
 @main
 enum Main {
+    static let delegate = AppDelegate()
+
     static func main() {
-        TodoBarApp.main()
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        app.delegate = delegate
+        app.run()
     }
 }

@@ -25,6 +25,7 @@ final class TodoStore {
 
     init() {
         load()
+        clearCompletedIfNewDay()
     }
 
     func add(_ title: String) {
@@ -45,9 +46,33 @@ final class TodoStore {
         save()
     }
 
+    func rename(_ item: TodoItem, to title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+        items[index].title = trimmed
+        save()
+    }
+
+    func move(fromIndex: Int, toIndex: Int) {
+        guard fromIndex != toIndex, items.indices.contains(fromIndex), items.indices.contains(toIndex) else { return }
+        let item = items.remove(at: fromIndex)
+        items.insert(item, at: toIndex)
+        save()
+    }
+
     func clearCompleted() {
         items.removeAll(where: \.done)
         save()
+    }
+
+    /// Daily reset: the first time the app is used on a new calendar day,
+    /// checked-off items are swept away so the list starts fresh.
+    func clearCompletedIfNewDay() {
+        let today = Calendar.current.startOfDay(for: Date())
+        let key = "lastResetDay"
+        if let last = UserDefaults.standard.object(forKey: key) as? Date, last >= today { return }
+        UserDefaults.standard.set(today, forKey: key)
+        if hasCompleted { clearCompleted() }
     }
 
     private func load() {

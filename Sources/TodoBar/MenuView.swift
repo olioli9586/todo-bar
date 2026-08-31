@@ -1,10 +1,12 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MenuView: View {
     let store: TodoStore
     @State private var newTitle = ""
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var listHeight: CGFloat = 0
+    @State private var draggingItem: TodoItem?
     @FocusState private var fieldFocused: Bool
 
     // The list grows with its content; only past this cap does it scroll.
@@ -14,8 +16,15 @@ struct MenuView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Todo")
-                .font(.headline)
+            HStack {
+                Text("Todo")
+                    .font(.headline)
+                Spacer()
+                Text("⌥T")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .help("Press Option-T anywhere to open TodoBar")
+            }
 
             TextField("Add a todo…", text: $newTitle)
                 .textFieldStyle(.roundedBorder)
@@ -37,6 +46,14 @@ struct MenuView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(store.items) { item in
                             TodoRow(item: item, store: store)
+                                .onDrag {
+                                    draggingItem = item
+                                    return NSItemProvider(object: item.id.uuidString as NSString)
+                                }
+                                .onDrop(
+                                    of: [UTType.text],
+                                    delegate: ReorderDelegate(item: item, store: store, dragging: $draggingItem)
+                                )
                         }
                     }
                     .background(GeometryReader { geo in
@@ -70,6 +87,9 @@ struct MenuView: View {
         }
         .padding(14)
         .frame(width: 280)
+        .onAppear {
+            DispatchQueue.main.async { fieldFocused = true }
+        }
     }
 }
 
@@ -80,10 +100,35 @@ struct ListHeightKey: PreferenceKey {
     }
 }
 
+struct ReorderDelegate: DropDelegate {
+    let item: TodoItem
+    let store: TodoStore
+    @Binding var dragging: TodoItem?
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging, dragging.id != item.id,
+              let from = store.items.firstIndex(where: { $0.id == dragging.id }),
+              let to = store.items.firstIndex(where: { $0.id == item.id }) else { return }
+        store.move(fromIndex: from, toIndex: to)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
+    }
+}
+
 struct TodoRow: View {
     let item: TodoItem
     let store: TodoStore
     @State private var hovering = false
+    @State private var isEditing = false
+    @State private var draft = ""
+    @FocusState private var editFocused: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -95,14 +140,31 @@ struct TodoRow: View {
             }
             .buttonStyle(.plain)
 
-            Text(item.title)
-                .strikethrough(item.done)
-                .foregroundStyle(item.done ? .secondary : .primary)
-                .lineLimit(2)
+            if isEditing {
+                TextField("", text: $draft)
+                    .textFieldStyle(.plain)
+                    .focused($editFocused)
+                    .onSubmit {
+                        store.rename(item, to: draft)
+                        isEditing = false
+                    }
+                    .onExitCommand { isEditing = false }
+                    .onAppear { editFocused = true }
+            } else {
+                Text(item.title)
+                    .strikethrough(item.done)
+                    .foregroundStyle(item.done ? .secondary : .primary)
+                    .lineLimit(2)
+                    .onTapGesture(count: 2) {
+                        draft = item.title
+                        isEditing = true
+                    }
+                    .help("Double-click to edit; drag to reorder")
+            }
 
             Spacer()
 
-            if hovering {
+            if hovering && !isEditing {
                 Button {
                     store.remove(item)
                 } label: {
@@ -115,6 +177,7 @@ struct TodoRow: View {
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
+        .contentShape(Rectangle())
         .background(hovering ? Color.primary.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 6))
         .onHover { hovering = $0 }
     }
