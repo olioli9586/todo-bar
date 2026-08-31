@@ -4,7 +4,13 @@ struct MenuView: View {
     let store: TodoStore
     @State private var newTitle = ""
     @State private var launchAtLogin = LoginItem.isEnabled
+    @State private var listHeight: CGFloat = 0
     @FocusState private var fieldFocused: Bool
+
+    // The list grows with its content; only past this cap does it scroll.
+    private var maxListHeight: CGFloat {
+        max(200, (NSScreen.main?.visibleFrame.height ?? 800) - 180)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -27,11 +33,18 @@ struct MenuView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
             } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(store.items) { item in
-                        TodoRow(item: item, store: store)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(store.items) { item in
+                            TodoRow(item: item, store: store)
+                        }
                     }
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: ListHeightKey.self, value: geo.size.height)
+                    })
                 }
+                .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
+                .frame(height: min(listHeight, maxListHeight))
             }
 
             Divider()
@@ -57,6 +70,13 @@ struct MenuView: View {
         }
         .padding(14)
         .frame(width: 280)
+    }
+}
+
+struct ListHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
