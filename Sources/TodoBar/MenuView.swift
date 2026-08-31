@@ -5,11 +5,19 @@ struct MenuView: View {
     let store: TodoStore
     @State private var newTitle = ""
     @State private var launchAtLogin = LoginItem.isEnabled
-    @State private var listHeight: CGFloat = 0
     @State private var draggingItem: TodoItem?
     @FocusState private var fieldFocused: Bool
 
-    // The list grows with its content; only past this cap does it scroll.
+    private let rowHeight: CGFloat = 28
+    private let rowSpacing: CGFloat = 2
+
+    // Rows have a fixed height, so the list height is plain arithmetic —
+    // it grows with content, and only past the screen-height cap does it scroll.
+    private var listHeight: CGFloat {
+        let count = CGFloat(store.items.count)
+        return count * rowHeight + max(0, count - 1) * rowSpacing
+    }
+
     private var maxListHeight: CGFloat {
         max(200, (NSScreen.main?.visibleFrame.height ?? 800) - 180)
     }
@@ -43,9 +51,10 @@ struct MenuView: View {
                     .padding(.vertical, 8)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: rowSpacing) {
                         ForEach(store.items) { item in
                             TodoRow(item: item, store: store)
+                                .frame(height: rowHeight)
                                 .onDrag {
                                     draggingItem = item
                                     return NSItemProvider(object: item.id.uuidString as NSString)
@@ -56,11 +65,7 @@ struct MenuView: View {
                                 )
                         }
                     }
-                    .background(GeometryReader { geo in
-                        Color.clear.preference(key: ListHeightKey.self, value: geo.size.height)
-                    })
                 }
-                .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
                 .frame(height: min(listHeight, maxListHeight))
             }
 
@@ -90,13 +95,6 @@ struct MenuView: View {
         .onAppear {
             DispatchQueue.main.async { fieldFocused = true }
         }
-    }
-}
-
-struct ListHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 
@@ -154,12 +152,13 @@ struct TodoRow: View {
                 Text(item.title)
                     .strikethrough(item.done)
                     .foregroundStyle(item.done ? .secondary : .primary)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                     .onTapGesture(count: 2) {
                         draft = item.title
                         isEditing = true
                     }
-                    .help("Double-click to edit; drag to reorder")
+                    .help(item.title)
             }
 
             Spacer()
