@@ -34,7 +34,8 @@ struct MenuView: View {
                     .help("Press Option-T anywhere to open TodoBar")
             }
 
-            TextField("Add a todo…", text: $newTitle)
+            TextField("Add a todo…", text: $newTitle, axis: .vertical)
+                .lineLimit(1...4)
                 .textFieldStyle(.roundedBorder)
                 .focused($fieldFocused)
                 .onSubmit {
