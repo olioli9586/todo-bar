@@ -10,12 +10,16 @@ struct MenuView: View {
 
     private let rowHeight: CGFloat = 28
     private let rowSpacing: CGFloat = 2
+    @State private var measuredListHeight: CGFloat = 0
 
-    // Rows have a fixed height, so the list height is plain arithmetic —
-    // it grows with content, and only past the screen-height cap does it scroll.
+    // Rows wrap long titles, so their height varies. We measure the real content
+    // height, but until the first measurement arrives we fall back to the
+    // one-line-per-row arithmetic — a too-short list merely scrolls, whereas a
+    // zero-height list never renders (and so never gets measured) at all.
     private var listHeight: CGFloat {
         let count = CGFloat(store.items.count)
-        return count * rowHeight + max(0, count - 1) * rowSpacing
+        let estimate = count * rowHeight + max(0, count - 1) * rowSpacing
+        return measuredListHeight > 0 ? measuredListHeight : estimate
     }
 
     private var maxListHeight: CGFloat {
@@ -55,7 +59,7 @@ struct MenuView: View {
                     VStack(alignment: .leading, spacing: rowSpacing) {
                         ForEach(store.items) { item in
                             TodoRow(item: item, store: store)
-                                .frame(height: rowHeight)
+                                .frame(minHeight: rowHeight)
                                 .onDrag {
                                     draggingItem = item
                                     return NSItemProvider(object: item.id.uuidString as NSString)
@@ -66,7 +70,11 @@ struct MenuView: View {
                                 )
                         }
                     }
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: ListHeightKey.self, value: geo.size.height)
+                    })
                 }
+                .onPreferenceChange(ListHeightKey.self) { measuredListHeight = $0 }
                 .frame(height: min(listHeight, maxListHeight))
             }
 
@@ -96,6 +104,13 @@ struct MenuView: View {
         .onAppear {
             DispatchQueue.main.async { fieldFocused = true }
         }
+    }
+}
+
+struct ListHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
@@ -130,7 +145,7 @@ struct TodoRow: View {
     @FocusState private var editFocused: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Button {
                 store.toggle(item)
             } label: {
@@ -140,7 +155,7 @@ struct TodoRow: View {
             .buttonStyle(.plain)
 
             if isEditing {
-                TextField("", text: $draft)
+                TextField("", text: $draft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .focused($editFocused)
                     .onSubmit {
@@ -153,32 +168,36 @@ struct TodoRow: View {
                 Text(item.title)
                     .strikethrough(item.done)
                     .foregroundStyle(item.done ? .secondary : .primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
                     .onTapGesture(count: 2) {
                         draft = item.title
                         isEditing = true
                     }
-                    .help(item.title)
             }
 
-            Spacer()
-
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .contentShape(Rectangle())
+        .background(hovering ? Color.primary.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 6))
+        // The remove button overlays the row instead of sitting in the HStack,
+        // so hovering never re-wraps the text (and never changes row height).
+        .overlay(alignment: .topTrailing) {
             if hovering && !isEditing {
                 Button {
                     store.remove(item)
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .background(.background, in: Circle())
                 }
                 .buttonStyle(.plain)
+                .padding(.top, 6)
+                .padding(.trailing, 6)
                 .help("Remove")
             }
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
-        .contentShape(Rectangle())
-        .background(hovering ? Color.primary.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 6))
         .onHover { hovering = $0 }
     }
 }
