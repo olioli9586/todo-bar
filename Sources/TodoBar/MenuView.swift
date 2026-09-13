@@ -14,8 +14,9 @@ struct MenuView: View {
 
     // Rows wrap long titles, so their height varies. We measure the real content
     // height, but until the first measurement arrives we fall back to the
-    // one-line-per-row arithmetic — a too-short list merely scrolls, whereas a
-    // zero-height list never renders (and so never gets measured) at all.
+    // one-line-per-row arithmetic. The height only decides whether the list
+    // needs to scroll — a fitting list lays itself out at natural height, so a
+    // stale estimate can never leave the popover too short.
     private var listHeight: CGFloat {
         let count = CGFloat(store.items.count)
         let estimate = count * rowHeight + max(0, count - 1) * rowSpacing
@@ -55,27 +56,20 @@ struct MenuView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: rowSpacing) {
-                        ForEach(store.items) { item in
-                            TodoRow(item: item, store: store)
-                                .frame(minHeight: rowHeight)
-                                .onDrag {
-                                    draggingItem = item
-                                    return NSItemProvider(object: item.id.uuidString as NSString)
-                                }
-                                .onDrop(
-                                    of: [UTType.text],
-                                    delegate: ReorderDelegate(item: item, store: store, dragging: $draggingItem)
-                                )
+                // A fitting list sits directly in the layout so the popover opens at
+                // exactly the right size; only an overflowing list gets wrapped in a
+                // fixed-height ScrollView.
+                Group {
+                    if listHeight > maxListHeight {
+                        ScrollView {
+                            todoList
                         }
+                        .frame(height: maxListHeight)
+                    } else {
+                        todoList
                     }
-                    .background(GeometryReader { geo in
-                        Color.clear.preference(key: ListHeightKey.self, value: geo.size.height)
-                    })
                 }
                 .onPreferenceChange(ListHeightKey.self) { measuredListHeight = $0 }
-                .frame(height: min(listHeight, maxListHeight))
             }
 
             Divider()
@@ -104,6 +98,26 @@ struct MenuView: View {
         .onAppear {
             DispatchQueue.main.async { fieldFocused = true }
         }
+    }
+
+    private var todoList: some View {
+        VStack(alignment: .leading, spacing: rowSpacing) {
+            ForEach(store.items) { item in
+                TodoRow(item: item, store: store)
+                    .frame(minHeight: rowHeight)
+                    .onDrag {
+                        draggingItem = item
+                        return NSItemProvider(object: item.id.uuidString as NSString)
+                    }
+                    .onDrop(
+                        of: [UTType.text],
+                        delegate: ReorderDelegate(item: item, store: store, dragging: $draggingItem)
+                    )
+            }
+        }
+        .background(GeometryReader { geo in
+            Color.clear.preference(key: ListHeightKey.self, value: geo.size.height)
+        })
     }
 }
 
