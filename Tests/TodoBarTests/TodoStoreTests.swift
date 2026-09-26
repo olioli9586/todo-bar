@@ -201,4 +201,45 @@ final class Sandbox {
         store.clearCompletedIfNewDay()
         #expect(store.items.isEmpty)
     }
+
+    @Test func aFutureResetDateDoesNotBlockResetsForever() {
+        // e.g. the clock was briefly set to next year when the app was used.
+        sandbox.now = Sandbox.date("2027-06-01T09:00:00Z")
+        _ = sandbox.makeStore()
+        sandbox.now = Sandbox.date("2026-09-25T09:00:00Z")
+        let store = sandbox.makeStore()
+        store.add("a")
+        store.toggle(store.items[0])
+        sandbox.now = Sandbox.date("2026-09-26T09:00:00Z")
+        store.clearCompletedIfNewDay()
+        #expect(store.items.isEmpty)
+    }
+
+    @Test func changingTimeZoneWithinTheSameDayDoesNotResetAgain() {
+        sandbox.calendar.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        sandbox.now = Sandbox.date("2026-09-25T01:00:00Z") // 10:00 on the 25th in Tokyo
+        let store = sandbox.makeStore()
+        store.add("a")
+        store.toggle(store.items[0])
+
+        // Fly to Los Angeles: still the 25th locally, so the checked item stays.
+        sandbox.calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        sandbox.now = Sandbox.date("2026-09-25T17:00:00Z") // 10:00 on the 25th in LA
+        let relaunched = sandbox.makeStore()
+        #expect(relaunched.items.count == 1)
+    }
+
+    @Test func legacyDateValueIsStillHonoured() {
+        let startOfToday = sandbox.calendar.startOfDay(for: sandbox.now)
+        sandbox.defaults.set(startOfToday, forKey: "lastResetDay")
+        try? FileManager.default.createDirectory(at: sandbox.dir, withIntermediateDirectories: true)
+        let seeded = [TodoItem(title: "done today", done: true)]
+        try? JSONEncoder().encode(seeded).write(to: sandbox.fileURL)
+
+        #expect(sandbox.makeStore().items.count == 1)
+
+        let startOfYesterday = sandbox.calendar.date(byAdding: .day, value: -1, to: startOfToday)!
+        sandbox.defaults.set(startOfYesterday, forKey: "lastResetDay")
+        #expect(sandbox.makeStore().items.isEmpty)
+    }
 }

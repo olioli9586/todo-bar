@@ -78,12 +78,26 @@ final class TodoStore {
 
     /// Daily reset: the first time the app is used on a new calendar day,
     /// checked-off items are swept away so the list starts fresh.
+    ///
+    /// The last reset is stored as a local calendar day ("2026-09-25") and
+    /// compared for equality, so a clock that was once set into the future, or
+    /// a time zone change, can't block or repeat resets.
     func clearCompletedIfNewDay() {
-        let today = calendar.startOfDay(for: now())
+        let today = dayKey(for: now())
         let key = "lastResetDay"
-        if let last = defaults.object(forKey: key) as? Date, last >= today { return }
+        let last: String? = switch defaults.object(forKey: key) {
+        case let day as String: day
+        case let date as Date: dayKey(for: date) // written by 1.0.3 and earlier
+        default: nil
+        }
+        if last == today { return }
         defaults.set(today, forKey: key)
         if hasCompleted { clearCompleted() }
+    }
+
+    private func dayKey(for date: Date) -> String {
+        let day = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
     }
 
     private func load() {
