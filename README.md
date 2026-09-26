@@ -30,6 +30,7 @@ Other targets:
 
 ```sh
 make build    # swift build -c release
+make test     # run the unit tests (swift-testing)
 make bundle   # build + create dist/TodoBar.app
 make run      # bundle + run in the foreground
 make clean    # remove .build and dist

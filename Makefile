@@ -3,10 +3,25 @@ BUILD_DIR = .build/release
 DIST = dist/$(APP_NAME).app
 INSTALL_DIR = /Applications
 
-.PHONY: build bundle install run clean
+# The Command Line Tools ship swift-testing, but SwiftPM doesn't find it on its
+# own (Xcode does). Point the compiler and linker at it when only the CLT is active.
+CLT = /Library/Developer/CommandLineTools
+CLT_FRAMEWORKS = $(CLT)/Library/Developer/Frameworks
+ifeq ($(shell xcode-select -p 2>/dev/null),$(CLT))
+TEST_FLAGS = -Xswiftc -F -Xswiftc $(CLT_FRAMEWORKS) \
+	-Xswiftc -Xfrontend -Xswiftc -disable-cross-import-overlays \
+	-Xlinker -F -Xlinker $(CLT_FRAMEWORKS) \
+	-Xlinker -rpath -Xlinker $(CLT_FRAMEWORKS) \
+	-Xlinker -rpath -Xlinker $(CLT)/Library/Developer/usr/lib
+endif
+
+.PHONY: build test bundle install run clean
 
 build:
 	swift build -c release
+
+test:
+	swift test $(TEST_FLAGS)
 
 bundle: build
 	rm -rf $(DIST)

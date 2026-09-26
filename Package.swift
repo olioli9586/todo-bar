@@ -8,6 +8,11 @@ let package = Package(
         .executableTarget(
             name: "TodoBar",
             path: "Sources/TodoBar"
+        ),
+        .testTarget(
+            name: "TodoBarTests",
+            dependencies: ["TodoBar"],
+            path: "Tests/TodoBarTests"
         )
     ]
 )
