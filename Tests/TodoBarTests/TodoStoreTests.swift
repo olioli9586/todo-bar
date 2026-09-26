@@ -136,6 +136,23 @@ final class Sandbox {
         store.add("first")
         #expect(FileManager.default.fileExists(atPath: sandbox.fileURL.path))
     }
+
+    @Test func unreadableFileIsBackedUpInsteadOfOverwritten() throws {
+        let original = Data("[{\"title\": \"half-written".utf8)
+        try FileManager.default.createDirectory(at: sandbox.dir, withIntermediateDirectories: true)
+        try original.write(to: sandbox.fileURL)
+
+        let store = sandbox.makeStore()
+        #expect(store.items.isEmpty)
+        store.add("new item")
+
+        let backups = try FileManager.default.contentsOfDirectory(atPath: sandbox.dir.path)
+            .filter { $0.hasPrefix("todos.corrupt-") }
+        #expect(backups.count == 1)
+        let backup = try Data(contentsOf: sandbox.dir.appendingPathComponent(backups[0]))
+        #expect(backup == original)
+        #expect(sandbox.makeStore().items.map(\.title) == ["new item"])
+    }
 }
 
 @Suite struct TodoStoreDailyResetTests {

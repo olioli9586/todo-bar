@@ -88,7 +88,16 @@ final class TodoStore {
 
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }
-        items = (try? JSONDecoder().decode([TodoItem].self, from: data)) ?? []
+        do {
+            items = try JSONDecoder().decode([TodoItem].self, from: data)
+        } catch {
+            // Move the unreadable file aside so the next save can't overwrite
+            // the user's todos with an empty list.
+            let backup = fileURL.deletingLastPathComponent()
+                .appendingPathComponent("todos.corrupt-\(Int(now().timeIntervalSince1970)).json")
+            try? FileManager.default.moveItem(at: fileURL, to: backup)
+            NSLog("TodoBar: couldn't read \(fileURL.path) (\(error)); moved it to \(backup.lastPathComponent)")
+        }
     }
 
     private func save() {
