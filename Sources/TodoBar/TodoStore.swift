@@ -15,15 +15,26 @@ final class TodoStore {
     var remainingCount: Int { items.count(where: { !$0.done }) }
     var hasCompleted: Bool { items.contains(where: \.done) }
 
-    static let fileURL: URL = {
-        let dir = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("TodoBar", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("todos.json")
-    }()
+    static let defaultFileURL: URL = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("TodoBar", isDirectory: true)
+        .appendingPathComponent("todos.json")
 
-    init() {
+    private let fileURL: URL
+    private let defaults: UserDefaults
+    private let calendar: Calendar
+    private let now: () -> Date
+
+    init(
+        fileURL: URL = TodoStore.defaultFileURL,
+        defaults: UserDefaults = .standard,
+        calendar: Calendar = .autoupdatingCurrent,
+        now: @escaping () -> Date = Date.init
+    ) {
+        self.fileURL = fileURL
+        self.defaults = defaults
+        self.calendar = calendar
+        self.now = now
         load()
         clearCompletedIfNewDay()
     }
@@ -68,20 +79,23 @@ final class TodoStore {
     /// Daily reset: the first time the app is used on a new calendar day,
     /// checked-off items are swept away so the list starts fresh.
     func clearCompletedIfNewDay() {
-        let today = Calendar.current.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: now())
         let key = "lastResetDay"
-        if let last = UserDefaults.standard.object(forKey: key) as? Date, last >= today { return }
-        UserDefaults.standard.set(today, forKey: key)
+        if let last = defaults.object(forKey: key) as? Date, last >= today { return }
+        defaults.set(today, forKey: key)
         if hasCompleted { clearCompleted() }
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: Self.fileURL) else { return }
+        guard let data = try? Data(contentsOf: fileURL) else { return }
         items = (try? JSONDecoder().decode([TodoItem].self, from: data)) ?? []
     }
 
     private func save() {
         guard let data = try? JSONEncoder().encode(items) else { return }
-        try? data.write(to: Self.fileURL, options: .atomic)
+        try? FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try? data.write(to: fileURL, options: .atomic)
     }
 }
