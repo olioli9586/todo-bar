@@ -109,8 +109,12 @@ final class TodoStore {
             // the user's todos with an empty list.
             let backup = fileURL.deletingLastPathComponent()
                 .appendingPathComponent("todos.corrupt-\(Int(now().timeIntervalSince1970)).json")
-            try? FileManager.default.moveItem(at: fileURL, to: backup)
-            NSLog("TodoBar: couldn't read \(fileURL.path) (\(error)); moved it to \(backup.lastPathComponent)")
+            do {
+                try FileManager.default.moveItem(at: fileURL, to: backup)
+                NSLog("TodoBar: couldn't read \(fileURL.path) (\(error)); moved it to \(backup.lastPathComponent)")
+            } catch let moveError {
+                NSLog("TodoBar: couldn't read \(fileURL.path) (\(error)) or move it aside (\(moveError))")
+            }
         }
     }
 

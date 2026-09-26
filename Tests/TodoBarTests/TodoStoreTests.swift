@@ -148,7 +148,7 @@ final class Sandbox {
 
         let backups = try FileManager.default.contentsOfDirectory(atPath: sandbox.dir.path)
             .filter { $0.hasPrefix("todos.corrupt-") }
-        #expect(backups.count == 1)
+        try #require(backups.count == 1)
         let backup = try Data(contentsOf: sandbox.dir.appendingPathComponent(backups[0]))
         #expect(backup == original)
         #expect(sandbox.makeStore().items.map(\.title) == ["new item"])
